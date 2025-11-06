@@ -78,7 +78,7 @@
       <div class="card"><div class="muted">Akurasi Forecast (WAPE)</div><div class="kpi" id="kpi-acc">—</div></div>
       <div class="card"><div class="muted">Service Rate AHM</div><div class="kpi" id="kpi-sr">—</div></div>
       <div class="card"><div class="muted">Lost Sales</div><div class="kpi" id="kpi-ls">—</div></div>
-      <div class="card"><div class="muted">Stock Level (sl)</div><div class="kpi" id="kpi-sl">—</div></div>
+      <div class="card"><div class="muted">Stock Level</div><div class="kpi" id="kpi-stocklevel">—</div></div>
     </div>
 
     <div class="row" style="margin-top:8px;align-items:center;gap:10px">
@@ -307,7 +307,7 @@
 <script>
 // ===== Mock Data =====
 const dataMock = {
-  kpi: { forecast_acc: 57.2, service_rate: 0.83, lost_sales: 124, sl: 10.2 },
+  kpi: { forecast_acc: 57.2, service_rate: 0.83, lost_sales: 124, stocklevel: 3.5 },
   service_rate: [ { year: 2023, rate: 52.1 }, { year: 2024, rate: 64.4 }, { year: 2025, rate: 57.0 } ],
   validation: [
     { part_no: "06164K16V01", depo: "KRW", manual: 170, ml_p50: 120, p90: 145, dev: 41.7, flag: "red" },
@@ -331,11 +331,11 @@ tabButtons.forEach(b=>{
   }
 });
 
-// ===== KPI (Service Rate, Lost Sales, sl) =====
+// ===== KPI (Service Rate, Lost Sales, DOH) =====
 function fmtPct(v){return (v*100).toFixed(1)+"%"}
 document.getElementById('kpi-sr').textContent = fmtPct(dataMock.kpi.service_rate);
 document.getElementById('kpi-ls').textContent = dataMock.kpi.lost_sales;
-document.getElementById('kpi-sl').textContent = dataMock.kpi.sl;
+document.getElementById('kpi-stocklevel').textContent = dataMock.kpi.stocklevel;
 
 // ===== Akurasi (WAPE) – dihitung dari data depo (filter ALL/BDG/CRB/KRW) =====
 let accChartInst = new Chart(document.getElementById('accChart'),{
@@ -772,4 +772,3 @@ function readLocalCSV(file, depo){
 </script>
 </body>
 </html>
-
