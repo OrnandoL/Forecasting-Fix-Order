@@ -1,0 +1,774 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>H3 – Forecasting Fix Order (Prototype)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <style>
+    :root{--bg:#0b1220;--panel:#111827;--muted:#9ca3af;--accent:#2563eb;--accent-200:#60a5fa;--red:#ef4444;--yellow:#f59e0b;--green:#10b981}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,system-ui,Arial;background:var(--bg);color:#e5e7eb}
+    header{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:14px 18px;background:#0f172a;position:sticky;top:0;border-bottom:1px solid #1f2937;z-index:10}
+    .brand{font-weight:700}
+    .tabs{display:flex;gap:8px;flex-wrap:wrap}
+    .tab{padding:8px 12px;border:1px solid #1f2937;border-radius:10px;background:#0f172a;color:#cbd5e1;cursor:pointer}
+    .tab.active{background:var(--accent);color:#fff;border-color:transparent}
+    main{padding:16px 20px;max-width:1280px;margin:auto}
+    .grid{display:grid;gap:12px}
+    .cards{grid-template-columns:repeat(4,minmax(0,1fr))}
+    @media (max-width:980px){.cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    .card{background:var(--panel);border:1px solid #1f2937;border-radius:16px;padding:14px}
+    .kpi{font-size:28px;font-weight:700}
+    .muted{color:var(--muted);font-size:12px}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px solid #1f2937}
+    th{color:#93c5fd;text-align:left}
+    .badge{padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid #1f2937}
+    .badge.red{background:#2b1214;color:#fecaca;border-color:#7f1d1d}
+    .badge.yellow{background:#38270e;color:#fde68a;border-color:#92400e}
+    .badge.green{background:#0f2e26;color:#bbf7d0;border-color:#064e3b}
+    .btn{background:#1e293b;color:#fff;border:1px solid #334155;border-radius:10px;padding:8px 12px;cursor:pointer}
+    .btn.primary{background:var(--accent);border-color:transparent}
+    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+    .hidden{display:none}
+    .toast{position:fixed;right:16px;bottom:16px;background:#111827;border:1px solid #1f2937;padding:10px 14px;border-radius:12px;opacity:0;transform:translateY(10px);transition:.2s}
+    .toast.show{opacity:1;transform:none}
+    .pill{padding:4px 8px;border-radius:999px;background:#0f172a;border:1px solid #1f2937;color:#cbd5e1;font-size:12px}
+    .ribbon{font-size:11px;padding:4px 8px;border-radius:999px;background:#312e81;border:1px solid #4338ca;color:#c7d2fe}
+    .modal{position:fixed;inset:0;background:rgba(2,6,23,.7);display:none;align-items:center;justify-content:center;z-index:50}
+    .modal .box{background:var(--panel);border:1px solid #1f2937;border-radius:14px;max-width:520px;width:92%;padding:16px}
+    .box h3{margin:0 0 6px 0}
+    textarea,input,select{background:#0b162b;border:1px solid #1f2937;border-radius:10px;color:#e5e7eb;padding:8px}
+    .side-overlay{position:fixed;top:64px;right:16px;width:360px;z-index:40}
+    .dropzone{border:2px dashed #334155;border-radius:12px;padding:10px;display:flex;align-items:center;gap:8px;cursor:pointer;background:#0c162b}
+    .note{font-size:12px;color:#9ca3af}
+    .persona-grid{display:grid;grid-template-columns:320px 1fr;gap:14px}
+    @media (max-width:980px){.persona-grid{grid-template-columns:1fr}}
+    .persona-photo{width:100%;border-radius:12px;border:2px solid #1f2937;object-fit:cover}
+    .tag{display:inline-block;background:#7f1d1d;border:1px solid #ef4444;color:#fecaca;padding:4px 8px;border-radius:10px;font-weight:600}
+    .persona-col{display:grid;gap:12px}
+  </style>
+</head>
+<body>
+<header>
+  <div class="brand">H3 – Forecasting Fix Order</div>
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-view="dashboard">Dashboard</button>
+    <button class="tab" data-view="validation">Validation</button>
+    <button class="tab" data-view="ai">AI Forecast</button>
+    <button class="tab" data-view="scenario">Scenario</button>
+    <button class="tab" data-view="approvals">Approval & Audit</button>
+    <button class="tab" data-view="persona">Persona</button>
+  </nav>
+</header>
+
+<main>
+  <!-- DASHBOARD -->
+  <section id="dashboard" class="view">
+    <div class="row" style="justify-content:space-between;margin-bottom:8px">
+      <div class="pill">Tema: ML Forecasting + Integrasi Supply AHM</div>
+      <div class="ribbon">2025 YTD Akurasi ~57% • Fluktuasi tinggi</div>
+    </div>
+
+    <div class="grid cards">
+      <div class="card"><div class="muted">Akurasi Forecast (WAPE)</div><div class="kpi" id="kpi-acc">—</div></div>
+      <div class="card"><div class="muted">Service Rate AHM</div><div class="kpi" id="kpi-sr">—</div></div>
+      <div class="card"><div class="muted">Lost Sales</div><div class="kpi" id="kpi-ls">—</div></div>
+      <div class="card"><div class="muted">Days of Inventory (DOH)</div><div class="kpi" id="kpi-doh">—</div></div>
+    </div>
+
+    <div class="row" style="margin-top:8px;align-items:center;gap:10px">
+      <label class="muted">Filter Depo</label>
+      <select id="depoFilter" class="btn" style="background:#0f172a;border-color:#1f2937">
+        <option value="ALL" selected>ALL (BDG+CRB+KRW)</option>
+        <option value="BDG">Bandung</option>
+        <option value="CRB">Cirebon</option>
+        <option value="KRW">Karawang</option>
+      </select>
+      <span class="muted">Tren Akurasi dihitung dari total Demand vs Forecast sesuai filter.</span>
+    </div>
+
+    <div class="grid" style="margin-top:12px;grid-template-columns:1fr 1fr">
+      <div class="card"><h4 style="margin:0 0 8px 0">Tren Akurasi</h4><canvas id="accChart" height="120"></canvas></div>
+
+      <div class="card">
+        <div class="row" style="justify-content:space-between;align-items:center;margin:0 0 8px 0">
+          <h4 style="margin:0">Service Rate Historis</h4>
+          <div id="srDz" class="dropzone" style="padding:6px"
+               onclick="document.getElementById('srCsvInput').click()"
+               ondragover="srDragOver(event)" ondragleave="srDragLeave(event)" ondrop="srDropCSV(event)">
+            <span class="muted">⬆️ Import CSV SR AHM (<code>year,rate</code> atau <code>date,rate</code>)</span>
+            <input id="srCsvInput" type="file" accept=".csv" style="display:none">
+          </div>
+        </div>
+        <canvas id="srChart" height="120"></canvas>
+      </div>
+    </div>
+
+    <!-- CSV per Depo -->
+    <div class="grid" style="margin-top:12px;grid-template-columns:repeat(3,1fr)">
+      <div id="bdgDz" class="dropzone"
+           onclick="document.getElementById('bdgCsvInput').click()"
+           ondragover="bdgDragOver(event)" ondragleave="bdgDragLeave(event)" ondrop="bdgDropCSV(event)">
+        <span class="muted">⬆️ Import CSV Bandung — header: <code>period(YYYY-MM),demand,forecast</code></span>
+        <input id="bdgCsvInput" type="file" accept=".csv" style="display:none">
+      </div>
+      <div id="crbDz" class="dropzone"
+           onclick="document.getElementById('crbCsvInput').click()"
+           ondragover="crbDragOver(event)" ondragleave="crbDragLeave(event)" ondrop="crbDropCSV(event)">
+        <span class="muted">⬆️ Import CSV Cirebon — header: <code>period(YYYY-MM),demand,forecast</code></span>
+        <input id="crbCsvInput" type="file" accept=".csv" style="display:none">
+      </div>
+      <div id="krwDz" class="dropzone"
+           onclick="document.getElementById('krwCsvInput').click()"
+           ondragover="krwDragOver(event)" ondragleave="krwDragLeave(event)" ondrop="krwDropCSV(event)">
+        <span class="muted">⬆️ Import CSV Karawang — header: <code>period(YYYY-MM),demand,forecast</code></span>
+        <input id="krwCsvInput" type="file" accept=".csv" style="display:none">
+      </div>
+    </div>
+
+    <div class="grid" style="margin-top:12px;grid-template-columns:repeat(3,1fr)">
+      <div class="card"><h4 style="margin:0 0 8px 0">Bandung – Demand vs Forecast</h4><canvas id="bdgChart" height="110"></canvas></div>
+      <div class="card"><h4 style="margin:0 0 8px 0">Cirebon – Demand vs Forecast</h4><canvas id="crbChart" height="110"></canvas></div>
+      <div class="card"><h4 style="margin:0 0 8px 0">Karawang – Demand vs Forecast</h4><canvas id="krwChart" height="110"></canvas></div>
+    </div>
+  </section>
+
+  <!-- VALIDATION -->
+  <section id="validation" class="view hidden">
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:8px">
+        <h3 style="margin:0">Forecast Validation</h3>
+        <div class="row">
+          <span class="muted">Flag: <span class="badge red">RED</span> Anomali • <span class="badge yellow">YELLOW</span> Waspada • <span class="badge green">GREEN</span> Normal</span>
+          <button class="btn primary" onclick="bulkAccept()">Accept All (Mock)</button>
+        </div>
+      </div>
+      <table id="valTable">
+        <thead><tr>
+          <th>Part No</th><th>Depo</th><th>Forecast Manual</th><th>ML P50</th><th>P90</th><th>Deviasi %</th><th>Flag</th><th>Action</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="muted" style="margin-top:6px">Indikator: <span class="ribbon">Forecast manual masih digunakan</span> → menunjukkan pain user (proses manual).</div>
+    </div>
+  </section>
+
+  <!-- AI FORECAST -->
+  <section id="ai" class="view hidden">
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:8px">
+        <h3 style="margin:0">AI Forecast Recommendation (Fix Order)</h3>
+        <div class="row">
+          <label class="muted">Budget Cap</label>
+          <input id="cap" type="number" value="50000000" style="width:160px">
+          <label class="muted">Service Level Target (%)</label>
+          <input id="sl" type="number" value="95" style="width:90px">
+          <button class="btn primary" onclick="runSolver()">Run Solver (Mock)</button>
+          <button class="btn" onclick="exportConsCSV()">Export PO (CSV)</button>
+        </div>
+      </div>
+      <div class="row" style="margin-bottom:8px">
+        <div id="dz" class="dropzone" onclick="fileInput.click()" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropCSV(event)">
+          <span class="muted">⬆️ Import CSV rekomendasi (klik/drag-drop)</span>
+          <input id="fileInput" type="file" accept=".csv" style="display:none">
+        </div>
+        <div class="note">Header: <code>part_no,depo,p50,p90,on_hand,on_order,moq,pack</code></div>
+      </div>
+      <div class="muted" style="margin-bottom:8px">Formula: <b>Need = P50 + SafetyStock(P90, LT) – OnHand – OnOrder</b></div>
+      <table id="consTable">
+        <thead><tr>
+          <th>Part No</th><th>Depo</th><th>P50</th><th>P90</th><th>On Hand</th><th>On Order</th><th>Need</th><th>MOQ</th><th>Pack</th><th>Rekomendasi PO</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- SCENARIO -->
+  <section id="scenario" class="view hidden">
+    <div class="card">
+      <div class="row">
+        <div>
+          <label class="muted">Depo</label>
+          <select id="depoSel">
+            <option value="BDG" selected>Bandung</option>
+            <option value="CRB">Cirebon</option>
+            <option value="KRW">Karawang</option>
+          </select>
+        </div>
+        <div id="tplDrop" class="dropzone" onclick="tplInput.click()" ondragover="tplDragOver(event)" ondragleave="tplDragLeave(event)" ondrop="tplDropFile(event)">
+          <span class="muted">⬆️ Import Template Dataset (.xlsx/.csv) — klik/drag-drop</span>
+          <input id="tplInput" type="file" accept=".xlsx,.csv" style="display:none">
+        </div>
+        <button class="btn" onclick="reloadDepoForScenario()">Reload Depo Series</button>
+        <button class="btn primary" onclick="applyScenarioFromTemplate()">Apply from Template</button>
+      </div>
+      <div class="note" id="tplInfo" style="margin-top:6px">Belum ada template yang dimuat.</div>
+      <div class="row" style="margin-top:10px">
+        <div class="card" style="flex:1"><h4 style="margin:0 0 8px 0">Before vs After</h4><canvas id="scenarioChart" height="120"></canvas></div>
+      </div>
+      <div id="scenarioNote" class="muted" style="margin-top:8px"></div>
+      <div class="card" style="margin-top:10px">
+        <h4 style="margin:0 0 8px 0">Active Template Rows (Top 10)</h4>
+        <table id="tplTable">
+          <thead><tr><th>Depo</th><th>Multiplier</th><th>LT (hari)</th><th>Supply</th><th>Info</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- APPROVAL & AUDIT -->
+  <section id="approvals" class="view hidden">
+    <div class="card">
+      <h3 style="margin-top:0">Approval Flow</h3>
+      <ol style="margin-top:6px">
+        <li>Sales Dept Head → Review & Approve</li>
+        <li>Inventory Analyst → Finalize & Kirim ke Principal (AHM)</li>
+      </ol>
+      <h4>Timeline</h4>
+      <ul id="timeline"></ul>
+      <h4>Audit Trail</h4>
+      <ul id="audit"></ul>
+    </div>
+  </section>
+
+  <!-- PERSONA -->
+  <section id="persona" class="view hidden">
+    <div class="card">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <h3 style="margin:0">User Persona</h3>
+        <button class="btn" onclick="togglePersona()">Toggle Persona Overlay</button>
+      </div>
+      <div class="persona-grid" style="margin-top:10px">
+        <div>
+          <span class="tag">Ridi • Parts Sales Section Head</span>
+          <img class="persona-photo" src="sandbox:/mnt/data/821f8ef4-9fd3-4818-bce9-7ae2b596b4ca.png" alt="Persona Ridi">
+          <div class="card" style="margin-top:10px"><em class="muted">“Kalau bisa, saya maunya sistem yang kasih rekomendasi, jadi saya tinggal review, bukan input manual lagi.”</em></div>
+        </div>
+        <div class="persona-col">
+          <div class="card"><h4>Goals</h4><p>“Meningkatkan efisiensi dan akurasi dalam menyusun forecast agar proses penjualan dan distribusi berjalan lancar.”</p></div>
+          <div class="card"><h4>Behaviours</h4><p>Setiap hari Ridi mengumpulkan data manual, mengolah di Excel, merevisi sesuai demand, berkomunikasi dengan jaringan; melakukan controlling & monitoring rutin.</p></div>
+          <div class="card"><h4>Frustrations</h4><p>Proses forecast manual, sulit feedback pembagian barang, ragu akurasi, khawatir lost sales. Butuh rekomendasi berbasis data terpercaya.</p></div>
+          <div class="card"><h4>Kebutuhan</h4><ul style="margin:0 0 0 16px"><li>Otomatisasi forecasting, minim input manual.</li><li>Rekomendasi berbasis histori & stok.</li></ul></div>
+          <div class="card"><h4>Motivations</h4><p>“Forecast yang membantu jaringan agar tidak kosong maupun overstock dan capai target sales.”</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- Persona Overlay -->
+<aside id="personaOverlay" class="side-overlay hidden">
+  <div class="card">
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <h3 style="margin:0">Persona – Ridi</h3>
+      <button class="btn" onclick="togglePersona()">Tutup</button>
+    </div>
+    <p class="muted" style="margin:6px 0 10px">“Saya ingin forecast yang saya buat bisa membantu jaringan agar barang tidak kosong maupun overstock.”</p>
+    <ul style="margin:0 0 8px 16px">
+      <li><b>Kebutuhan:</b> visibilitas supply vs demand real-time</li>
+      <li><b>Pain:</b> pekerjaan manual tinggi, rawan human error</li>
+      <li><b>Goal:</b> keputusan pemesanan cepat & akurat</li>
+    </ul>
+  </div>
+</aside>
+
+<!-- Adjust Modal -->
+<div id="adjustModal" class="modal">
+  <div class="box">
+    <h3>Adjust Forecast</h3>
+    <div class="row">
+      <div><label class="muted">Part No</label><input id="adjPart" readonly></div>
+      <div><label class="muted">Depo</label><input id="adjDepo" readonly></div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <div><label class="muted">ML P50</label><input id="adjP50" readonly style="width:120px"></div>
+      <div><label class="muted">Manual</label><input id="adjManual" type="number" style="width:120px"></div>
+    </div>
+    <div style="margin-top:8px">
+      <label class="muted">Alasan Koreksi</label>
+      <textarea id="adjReason" rows="3" style="width:100%" placeholder="Tuliskan alasan (promo, event, data store, dsb)"></textarea>
+    </div>
+    <div class="row" style="justify-content:flex-end;margin-top:10px">
+      <button class="btn" onclick="closeAdjust()">Batal</button>
+      <button class="btn primary" onclick="saveAdjust()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast">Tersimpan</div>
+
+<script>
+// ===== Mock Data =====
+const dataMock = {
+  kpi: { forecast_acc: 57.2, service_rate: 0.83, lost_sales: 124, doh: 35 },
+  service_rate: [ { year: 2023, rate: 52.1 }, { year: 2024, rate: 64.4 }, { year: 2025, rate: 57.0 } ],
+  validation: [
+    { part_no: "06164K16V01", depo: "KRW", manual: 170, ml_p50: 120, p90: 145, dev: 41.7, flag: "red" },
+    { part_no: "15410K0JN01", depo: "BDG", manual: 82,  ml_p50: 85,  p90: 98,  dev: -3.5, flag: "green" }
+  ],
+  rekomendasi_po: [
+    { part_no: "06164K16V01", moq: 24, pack: 12, depo: "KRW", on_hand: 60, on_order: 30, p50: 120, p90:145 },
+    { part_no: "15410K0JN01", moq: 24, pack: 6,  depo: "BDG", on_hand: 40, on_order: 20, p50: 85,  p90:98 }
+  ]
+};
+
+// ===== Tabs =====
+const tabButtons = document.querySelectorAll('.tab');
+const views = document.querySelectorAll('.view');
+tabButtons.forEach(b=>{
+  b.onclick = ()=>{
+    tabButtons.forEach(t=>t.classList.remove('active'));
+    b.classList.add('active');
+    views.forEach(v=>v.classList.add('hidden'));
+    document.getElementById(b.dataset.view).classList.remove('hidden');
+  }
+});
+
+// ===== KPI (Service Rate, Lost Sales, DOH) =====
+function fmtPct(v){return (v*100).toFixed(1)+"%"}
+document.getElementById('kpi-sr').textContent = fmtPct(dataMock.kpi.service_rate);
+document.getElementById('kpi-ls').textContent = dataMock.kpi.lost_sales;
+document.getElementById('kpi-doh').textContent = dataMock.kpi.doh;
+
+// ===== Akurasi (WAPE) – dihitung dari data depo (filter ALL/BDG/CRB/KRW) =====
+let accChartInst = new Chart(document.getElementById('accChart'),{
+  type:'line',
+  data:{labels:[], datasets:[{label:'Akurasi (%)', data:[], borderColor:varGet('--accent-200'), backgroundColor:'transparent', tension:.3}]},
+  options:{plugins:{legend:{display:false}}, scales:{y:{min:0,max:100, grid:{color:'rgba(148,163,184,.2)'}}}}
+});
+function varGet(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim()}
+
+// ===== Service Rate Chart + Upload CSV =====
+let srChartInst = new Chart(document.getElementById('srChart'),{
+  type:'bar',
+  data:{
+    labels: dataMock.service_rate.map(d=>d.year),
+    datasets:[{label:'Service Rate (%)', data:dataMock.service_rate.map(d=>d.rate), backgroundColor:varGet('--accent')}]
+  },
+  options:{plugins:{legend:{display:false}}, scales:{y:{min:0,max:100, grid:{color:'rgba(148,163,184,.2)'}}}}
+});
+
+const srCsvInput = document.getElementById('srCsvInput');
+if(srCsvInput){ srCsvInput.addEventListener('change', function(){ const f=this.files[0]; if(f) readServiceRateCSV(f); }); }
+function srDragOver(e){ e.preventDefault(); document.getElementById('srDz').style.borderColor='#60a5fa' }
+function srDragLeave(){ document.getElementById('srDz').style.borderColor='#334155' }
+function srDropCSV(e){ e.preventDefault(); srDragLeave(); const f=e.dataTransfer.files[0]; if(f) readServiceRateCSV(f) }
+
+function readServiceRateCSV(file){
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    const rows = parseServiceRateCSV(reader.result);
+    if(!rows.length){ showToast('CSV Service Rate kosong / header salah'); return }
+    updateServiceRate(rows);
+    showToast('Service Rate diperbarui dari CSV');
+  };
+  reader.readAsText(file);
+}
+function parseServiceRateCSV(text){
+  const raw=String(text||'').replace(/^\uFEFF/,'');
+  const lines=raw.split(/\r?\n/).filter(l=>l.trim()); if(lines.length<2) return [];
+  const head=lines[0];
+  const cnt=(ch)=> (head.match(new RegExp(ch,'g'))||[]).length;
+  const semi=cnt(';'), comma=cnt(','), tab=cnt('\t');
+  const DELIM=(semi>comma && semi>=tab)? ';' : (tab>comma && tab>semi? '\t' : ',');
+  const esc=DELIM==='\t'? '\\t' : DELIM.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const splitter=new RegExp(esc+'(?=(?:[^"]*"[^"]*")*[^"]*$)');
+  const norm=(s)=> String(s||'').toLowerCase().replace(/[\s_\-]/g,'');
+  const headers=head.split(splitter).map(h=> norm(h.replace(/^"|"$/g,'')) );
+  const idx={
+    year: headers.findIndex(h=> ['year','tahun'].includes(h)),
+    date: headers.findIndex(h=> ['date','tanggal','tgl'].includes(h)),
+    rate: headers.findIndex(h=> ['rate','servicerate','sr','ach','achv','achieve'].includes(h))
+  };
+  if((idx.year<0 && idx.date<0) || idx.rate<0) return [];
+  const out=[];
+  for(let i=1;i<lines.length;i++){
+    const cells=lines[i].split(splitter).map(c=> c.replace(/^"|"$/g,'').trim());
+    let y=null;
+    if(idx.year>=0){ y = Number(cells[idx.year]); }
+    else { const d=cells[idx.date]; const m=d && d.match(/(20\d{2}|19\d{2})/); y = m? Number(m[1]) : null; }
+    let t = String(cells[idx.rate]).replace(/\u00A0/g,' ').trim();
+    const hasCommaDec=/,\d{1,3}$/.test(t); if(hasCommaDec){ t=t.replace(/\./g,'').replace(',', '.'); } else { t=t.replace(/,/g,''); }
+    let val = Number(t); if(isNaN(val)) continue; if(val<=1) val=val*100;
+    if(y) out.push({year:y, rate:val});
+  }
+  return out;
+}
+function updateServiceRate(rows){
+  const sorted = rows.sort((a,b)=> a.year - b.year);
+  srChartInst.data.labels = sorted.map(r=> r.year);
+  srChartInst.data.datasets[0].data = sorted.map(r=> r.rate);
+  srChartInst.update();
+  const last = sorted[sorted.length-1];
+  if(last){ document.getElementById('kpi-sr').textContent = (Number(last.rate)||0).toFixed(1)+'%'; }
+}
+
+// ===== Depo Charts (BDG/CRB/KRW) =====
+const depoSeries = {
+  labels:['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'],
+  BDG:{demand:[220,215,228,235,240,248,252,260,255,268,270,275], fc:[218,220,226,232,238,244,250,255,258,262,268,272]},
+  CRB:{demand:[100,105,110,112,118,120,126,130,128,132,135,140], fc:[98,102,108,110,116,118,121,128,126,131,133,138]},
+  KRW:{demand:[130,128,140,142,150,158,162,168,170,172,176,180], fc:[128,130,138,140,148,156,160,166,168,170,174,178]}
+};
+const bdgChartInst = new Chart(document.getElementById('bdgChart'),{
+  type:'line',
+  data:{labels:depoSeries.labels, datasets:[
+    {label:'Demand', data:depoSeries.BDG.demand, borderColor:'#9ca3af', backgroundColor:'transparent', tension:.25},
+    {label:'Forecast', data:depoSeries.BDG.fc, borderColor:varGet('--accent-200'), backgroundColor:'transparent', borderDash:[6,6], tension:.25}
+  ]},
+  options:{plugins:{legend:{labels:{color:'#cbd5e1'}}}, scales:{y:{grid:{color:'rgba(148,163,184,.15)'}}}}
+});
+const crbChartInst = new Chart(document.getElementById('crbChart'),{
+  type:'line',
+  data:{labels:depoSeries.labels, datasets:[
+    {label:'Demand', data:depoSeries.CRB.demand, borderColor:'#9ca3af', backgroundColor:'transparent', tension:.25},
+    {label:'Forecast', data:depoSeries.CRB.fc, borderColor:varGet('--accent-200'), backgroundColor:'transparent', borderDash:[6,6], tension:.25}
+  ]},
+  options:{plugins:{legend:{labels:{color:'#cbd5e1'}}}, scales:{y:{grid:{color:'rgba(148,163,184,.15)'}}}}
+});
+const krwChartInst = new Chart(document.getElementById('krwChart'),{
+  type:'line',
+  data:{labels:depoSeries.labels, datasets:[
+    {label:'Demand', data:depoSeries.KRW.demand, borderColor:'#9ca3af', backgroundColor:'transparent', tension:.25},
+    {label:'Forecast', data:depoSeries.KRW.fc, borderColor:varGet('--accent-200'), backgroundColor:'transparent', borderDash:[6,6], tension:.25}
+  ]},
+  options:{plugins:{legend:{labels:{color:'#cbd5e1'}}}, scales:{y:{grid:{color:'rgba(148,163,184,.15)'}}}}
+});
+
+// ===== State tren akurasi (WAPE) dari CSV depo =====
+const depotState = { BDG: [], CRB: [], KRW: [] };
+(function seedState(){
+  const months = ['2025-01','2025-02','2025-03','2025-04','2025-05','2025-06','2025-07','2025-08','2025-09','2025-10','2025-11','2025-12'];
+  depotState.BDG = months.map((p,i)=>({period:p,demand:depoSeries.BDG.demand[i]||0, fc:depoSeries.BDG.fc[i]||0}));
+  depotState.CRB = months.map((p,i)=>({period:p,demand:depoSeries.CRB.demand[i]||0, fc:depoSeries.CRB.fc[i]||0}));
+  depotState.KRW = months.map((p,i)=>({period:p,demand:depoSeries.KRW.demand[i]||0, fc:depoSeries.KRW.fc[i]||0}));
+})();
+function monthLabel(ym){
+  const m=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  const [y,mm] = (ym||'2025-01').split('-');
+  return m[(parseInt(mm)||1)-1] + ' ' + y.slice(2)
+}
+function recomputeTrendAndKPI(){
+  const filter = document.getElementById('depoFilter').value;
+  const selected = filter==='ALL' ? ['BDG','CRB','KRW'] : [filter];
+  const set = new Set(); selected.forEach(k=> depotState[k].forEach(r=> set.add(r.period)));
+  const periods = Array.from(set).sort();
+  const labels = periods.map(monthLabel);
+  const agg = periods.map(p=>{
+    let d=0,f=0;
+    selected.forEach(k=>{
+      const r = depotState[k].find(x=>x.period===p);
+      if(r){ d+=Number(r.demand)||0; f+=Number(r.fc)||0; }
+    });
+    return {period:p, demand:d, fc:f};
+  });
+  const monthlyAcc = agg.map(x=>{ const ape = x.demand>0 ? Math.abs(x.demand - x.fc)/x.demand : 0; return Math.max(0, 100*(1-ape)); });
+  const sumAbsErr = agg.reduce((a,x)=> a + Math.abs(x.demand - x.fc), 0);
+  const sumDemand = agg.reduce((a,x)=> a + x.demand, 0);
+  const wapeAcc = sumDemand>0 ? 100*(1 - (sumAbsErr/sumDemand)) : 0;
+  accChartInst.data.labels = labels;
+  accChartInst.data.datasets[0].data = monthlyAcc;
+  accChartInst.update();
+  document.getElementById('kpi-acc').textContent = wapeAcc.toFixed(1) + '%';
+}
+document.getElementById('depoFilter').addEventListener('change', recomputeTrendAndKPI);
+recomputeTrendAndKPI();
+
+// ===== Validation =====
+const tbody = document.querySelector('#valTable tbody');
+renderValidation();
+function renderValidation(){
+  tbody.innerHTML='';
+  dataMock.validation.forEach((r,i)=>{
+    const badge = r.flag==='red'? 'red' : (Math.abs(r.dev)>=10? 'yellow':'green');
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${r.part_no}</td>
+      <td>${r.depo}</td>
+      <td>${r.manual} ${r.manual!==r.ml_p50? '<span class="ribbon">manual used</span>':''}</td>
+      <td>${r.ml_p50}</td><td>${r.p90}</td><td>${r.dev.toFixed(1)}%</td>
+      <td><span class="badge ${badge}">${badge.toUpperCase()}</span></td>
+      <td><button class="btn" onclick="acceptRow(${i})">Accept</button>
+          <button class="btn" onclick="openAdjust(${i})">Adjust</button></td>`;
+    tbody.appendChild(tr);
+  });
+}
+function acceptRow(i){ addAudit(`Accept oleh Inventory Analyst pada baris ${i+1}`); showToast('Accepted'); }
+function openAdjust(i){ const r=dataMock.validation[i]; adjPart.value=r.part_no; adjDepo.value=r.depo; adjP50.value=r.ml_p50; adjManual.value=r.manual; adjReason.value=''; document.getElementById('adjustModal').style.display='flex'; }
+function closeAdjust(){ document.getElementById('adjustModal').style.display='none' }
+function saveAdjust(){
+  const part=adjPart.value, depo=adjDepo.value, newManual=Number(adjManual.value||0), reason=adjReason.value.trim();
+  const row=dataMock.validation.find(r=>r.part_no===part && r.depo===depo);
+  if(row){ row.manual=newManual; addAudit(`Adjust ${part}/${depo} → ${newManual}. Reason: ${reason||'-'}`) }
+  renderValidation(); closeAdjust(); showToast('Adjustment saved')
+}
+function bulkAccept(){ addAudit('Bulk accept seluruh baris (Validation)'); showToast('Bulk accepted') }
+
+// ===== AI Fix Order =====
+const consBody = document.querySelector('#consTable tbody');
+const fileInput = document.getElementById('fileInput');
+renderCons();
+function calcNeed(r){ return Math.max(0, Math.round(r.p50 + (r.p90 - r.p50) - r.on_hand - r.on_order)) }
+function calcRec(need, moq, pack){ return Math.max(0, Math.ceil(Math.max(need, moq)/pack)*pack) }
+function renderCons(){
+  consBody.innerHTML='';
+  dataMock.rekomendasi_po.forEach(r=>{
+    const need=calcNeed(r);
+    const rec=calcRec(need,r.moq,r.pack);
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${r.part_no}</td><td>${r.depo}</td><td>${r.p50}</td><td>${r.p90}</td><td>${r.on_hand}</td><td>${r.on_order}</td><td>${need}</td><td>${r.moq}</td><td>${r.pack}</td><td>${rec}</td>`;
+    consBody.appendChild(tr);
+  })
+}
+function runSolver(){
+  const capVal=Number(document.getElementById('cap').value||0);
+  const targetSL=Number(document.getElementById('sl').value||95);
+  let total=0; [...consBody.querySelectorAll('tr')].forEach(tr=> total+=Number(tr.children[9].textContent||0));
+  if(total*10000>capVal){
+    [...consBody.querySelectorAll('tr')].forEach(tr=>{
+      const rec=Number(tr.children[9].textContent), pack=Number(tr.children[8].textContent);
+      tr.children[9].textContent=Math.max(0, rec-pack);
+    })
+  }
+  addTimeline(`Solver dijalankan (Target SL ${targetSL}%)`);
+  addAudit('Run solver mock & update rekomendasi');
+  showToast('Solver selesai (mock)')
+}
+fileInput.addEventListener('change', handleFiles);
+function dragOver(e){ e.preventDefault(); dz.style.borderColor='#60a5fa' }
+function dragLeave(){ dz.style.borderColor='#334155' }
+function dropCSV(e){ e.preventDefault(); dragLeave(); const f=e.dataTransfer.files[0]; if(f) readCSV(f) }
+function handleFiles(){ const f=this.files[0]; if(f) readCSV(f) }
+function readCSV(file){ const reader=new FileReader(); reader.onload=()=> loadCSVToAI(reader.result); reader.readAsText(file) }
+function parseCSV(text){ const lines=text.trim().split(/\r?\n/); if(lines.length<2) return []; const headers=lines[0].split(',').map(h=>h.trim().toLowerCase()); return lines.slice(1).map(line=>{ const cells=line.split(',').map(c=>c.trim()); const o={}; headers.forEach((h,i)=> o[h]=cells[i]); return o; }).filter(o=>o.part_no) }
+function toNum(v){ const n=Number(v); return isNaN(n)?0:n }
+function loadCSVToAI(csvText){
+  const rows=parseCSV(csvText);
+  if(!rows.length){ showToast('CSV kosong / header salah'); return }
+  dataMock.rekomendasi_po=rows.map(r=>({ part_no:r.part_no, depo:r.depo||'BDG', p50:toNum(r.p50), p90:toNum(r.p90||r.p50), on_hand:toNum(r.on_hand), on_order:toNum(r.on_order), moq:Math.max(1,toNum(r.moq)||1), pack:Math.max(1,toNum(r.pack)||1) }));
+  renderCons(); addAudit(`Import CSV rekomendasi (${rows.length} baris)`); showToast('CSV dimuat')
+}
+function tableToCSV(){
+  const headers=['part_no','depo','p50','p90','on_hand','on_order','need','moq','pack','rekomendasi_po'];
+  const rows=[...consBody.querySelectorAll('tr')].map(tr=>{
+    const c=[...tr.children].map(td=>td.textContent);
+    return [c[0],c[1],c[2],c[3],c[4],c[5],c[6],c[7],c[8],c[9]]
+  });
+  return [headers.join(',')].concat(rows.map(r=>r.join(','))).join('\n')
+}
+function download(name, text){
+  const blob=new Blob([text],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url)
+}
+function exportConsCSV(){
+  const csv=tableToCSV();
+  const ts=new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+  download(`PO_Rekomendasi_${ts}.csv`, csv);
+  addAudit('Export PO CSV'); showToast('CSV diekspor')
+}
+
+// ===== Scenario (Template dataset) =====
+let scBefore=[]; let scAfter=[]; let scChart; let templateRows=[];
+function initScenarioChart(){
+  const ctx=document.getElementById('scenarioChart');
+  if(scChart) scChart.destroy();
+  scChart=new Chart(ctx,{
+    type:'line',
+    data:{labels:[], datasets:[
+      {label:'Before', data:[], borderColor:'#94a3b8', tension:.3},
+      {label:'After',  data:[], borderColor:varGet('--accent-200'), tension:.3}
+    ]},
+    options:{plugins:{legend:{labels:{color:'#cbd5e1'}}}}
+  });
+}
+initScenarioChart();
+function loadDepoSeriesForScenario(depo){
+  const key={BDG:'BDG',CRB:'CRB',KRW:'KRW'}[depo]||'BDG';
+  const src=depoSeries[key]; const lbl=depoSeries.labels;
+  scBefore=src? src.demand.slice(-8):[100,110,105,120,115,118,123,130];
+  scAfter=[...scBefore];
+  scChart.data.labels=lbl.slice(-8);
+  scChart.data.datasets[0].data=scBefore;
+  scChart.data.datasets[1].data=scAfter;
+  scChart.update();
+}
+loadDepoSeriesForScenario('BDG');
+
+const tplInput=document.getElementById('tplInput');
+const tplTbody=document.querySelector('#tplTable tbody');
+const tplInfo=document.getElementById('tplInfo');
+if(tplInput){ tplInput.addEventListener('change', function(){ const f=this.files[0]; if(f) readTemplateFile(f) }) }
+function tplDragOver(e){ e.preventDefault(); document.getElementById('tplDrop').style.borderColor='#60a5fa' }
+function tplDragLeave(){ document.getElementById('tplDrop').style.borderColor='#334155' }
+function tplDropFile(e){ e.preventDefault(); tplDragLeave(); const f=e.dataTransfer.files[0]; if(f) readTemplateFile(f) }
+function reloadDepoForScenario(){ loadDepoSeriesForScenario(document.getElementById('depoSel').value); showToast('Depo series dimuat') }
+
+function readTemplateFile(file){
+  const name=file.name.toLowerCase();
+  if(name.endsWith('.xlsx')){
+    const reader=new FileReader();
+    reader.onload=(e)=>{ const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'}); const ws=wb.Sheets[wb.SheetNames[0]]; const json=XLSX.utils.sheet_to_json(ws,{defval:''}); loadTemplateRows(json); };
+    reader.readAsArrayBuffer(file)
+  } else if(name.endsWith('.csv')){
+    const reader=new FileReader();
+    reader.onload=()=>{ const lines=reader.result.trim().split(/\r?\n/); if(lines.length<2) return;
+      const headers=lines[0].split(',').map(h=>h.trim());
+      const rows=lines.slice(1).map(line=>{ const cells=line.split(','); const o={}; headers.forEach((h,i)=> o[h]=cells[i]); return o; });
+      loadTemplateRows(rows)
+    };
+    reader.readAsText(file)
+  } else { showToast('Format tidak didukung') }
+}
+function normKey(k){ return String(k||'').toLowerCase().replace(/\s+|_/g,'') }
+function toNumLocal(v){ const n=Number(v); return isNaN(n)?0:n }
+function loadTemplateRows(rows){
+  templateRows = rows.map(r=>{
+    const m={}; Object.keys(r).forEach(k=> m[normKey(k)]=r[k]);
+    const depo=(m['depo']||m['warehouse']||m['depot']||'').toString().toUpperCase().slice(0,3);
+    const mult=toNumLocal(m['multiplier']||m['factor']);
+    const promo=toNumLocal(m['promo']||m['promopct']||m['promopercent']);
+    const lt=toNumLocal(m['lt']||m['leadtime']||m['leadtimehari']);
+    const supply=(m['supply']||m['constraint']||'').toString().toLowerCase();
+    const info=m['info']||m['keterangan']||'';
+    let mm=mult>0? mult : (promo? 1+promo/100 : 1);
+    if(mult===0 && supply==='oos') mm*=0.70;
+    if(mult===0 && lt) mm*=(1+(lt-7)*0.005);
+    return { depo, multiplier:Number(mm.toFixed(3)), lt, supply, info };
+  }).filter(r=>r.depo);
+
+  tplTbody.innerHTML='';
+  const sel=document.getElementById('depoSel').value;
+  const filtered=templateRows.filter(r=>r.depo===sel || r.depo==='ALL').slice(0,10);
+  filtered.forEach(r=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${r.depo}</td><td>${r.multiplier}</td><td>${r.lt||''}</td><td>${r.supply||''}</td><td>${r.info||''}</td>`;
+    tplTbody.appendChild(tr)
+  });
+  tplInfo.textContent=`Template dimuat: ${templateRows.length} baris. Menampilkan ${filtered.length} untuk depo ${sel}.`;
+  showToast('Template dataset dimuat')
+}
+function applyScenarioFromTemplate(){
+  if(!templateRows.length){ showToast('Belum ada template. Unggah file dulu.'); return }
+  const depo=document.getElementById('depoSel').value;
+  const rows=templateRows.filter(r=> r.depo===depo || r.depo==='ALL');
+  if(!rows.length){ showToast('Tidak ada baris untuk depo terpilih'); return }
+  let m=1; rows.forEach(r=> m*= (r.multiplier||1));
+  loadDepoSeriesForScenario(depo);
+  scAfter=scBefore.map(v=> Math.round(v*m));
+  scChart.data.datasets[1].data=scAfter; scChart.update();
+  const deltaPct=Math.round(((scAfter.reduce((a,b)=>a+b,0)/scBefore.reduce((a,b)=>a+b,0))-1)*100);
+  scenarioNote.textContent=`Template diterapkan (${rows.length} baris) → perubahan ${deltaPct>=0?'naik':'turun'} ${Math.abs(deltaPct)}% pada depo ${depo}.`;
+  addAudit(`Scenario applied from template (${rows.length} rows, m=${m.toFixed(3)})`);
+  showToast('Scenario applied from template')
+}
+
+// ===== Approval & utils =====
+function addTimeline(text){ const li=document.createElement('li'); li.textContent=ts()+" – "+text; document.getElementById('timeline').prepend(li) }
+function addAudit(text){ const li=document.createElement('li'); li.textContent=ts()+" – "+text; document.getElementById('audit').prepend(li) }
+function ts(){ return new Date().toISOString().slice(0,19).replace('T',' ') }
+function togglePersona(){ document.getElementById('personaOverlay').classList.toggle('hidden') }
+function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1500) }
+addTimeline('Draft PO direview oleh Sales Dept Head');
+addTimeline('Forecast disahkan oleh Inventory Analyst');
+
+// ===== CSV Depo (robust) =====
+function parseDepotCSV(text){
+  if(!text) return [];
+  const raw = String(text).replace(/^\uFEFF/, '');
+  const lines = raw.split(/\r?\n/).filter(l=>l.trim().length>0);
+  if(lines.length < 2) return [];
+  const head = lines[0];
+  const cnt = (ch)=> (head.match(new RegExp(ch,'g'))||[]).length;
+  const semi = cnt(';'), comma = cnt(','), tab = cnt('\t');
+  const DELIM = (semi>comma && semi>=tab) ? ';' : (tab>comma && tab>semi ? '\t' : ',');
+  const esc = DELIM==='\t' ? '\\t' : DELIM.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const splitter = new RegExp(esc + '(?=(?:[^"]*"[^"]*")*[^"]*$)');
+  const normKey = k => String(k||'').toLowerCase().replace(/[\s_\-]/g,'');
+  const headers = head.split(splitter).map(h=> normKey(h.replace(/^"|"$/g,'')) );
+  const idx = {
+    period: headers.findIndex(h=> ['period','periode','month','bulan','ym'].includes(h)),
+    demand: headers.findIndex(h=> ['demand','actual','qty','volume','vol'].includes(h)),
+    fc:     headers.findIndex(h=> ['forecast','fc','pred','forc'].includes(h))
+  };
+  if (idx.period < 0 || idx.demand < 0 || idx.fc < 0) return [];
+  function toNumID(val){
+    if(val==null) return 0;
+    let t=String(val).replace(/\u00A0/g,' ').trim();
+    if(!t) return 0;
+    const hasCommaDec = /,\d{1,3}$/.test(t);
+    if(hasCommaDec){ t = t.replace(/\./g,'').replace(',', '.'); }
+    else { t = t.replace(/,/g,''); }
+    const n=Number(t); return isNaN(n)?0:n
+  }
+  function normPeriod(p){
+    const s=String(p||'').trim();
+    const m=s.match(/(20\d{2}|19\d{2})[\/\-\.]?(\d{1,2})/);
+    if(m){ const y=m[1], mm=('0'+m[2]).slice(-2); return `${y}-${mm}` }
+    return s
+  }
+  const rows=[];
+  for(let i=1;i<lines.length;i++){
+    const cells = lines[i].split(splitter).map(c=> c.replace(/^"|"$/g,'').trim());
+    const period=normPeriod(cells[idx.period]);
+    const demand=toNumID(cells[idx.demand]);
+    const fc=toNumID(cells[idx.fc]);
+    if(period){ rows.push({period, demand, fc}); }
+  }
+  return rows;
+}
+function monthName(ym){ const m=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']; const mm=(parseInt((ym||'0000-01').split('-')[1])||1)-1; return m[Math.max(0,Math.min(11,mm))] }
+function updateDepotChartFromRows(rows, chartInst){
+  const arr = rows.sort((a,b)=> a.period.localeCompare(b.period)).slice(-12);
+  if(!arr.length) return;
+  chartInst.data.labels = arr.map(x=>monthName(x.period));
+  chartInst.data.datasets[0].data = arr.map(x=>x.demand);
+  chartInst.data.datasets[1].data = arr.map(x=>x.fc);
+  chartInst.update();
+}
+function storeDepotState(depoCode, rows){
+  const norm = rows.map(r=>({ period: r.period, demand: Number(r.demand)||0, fc: Number(r.fc)||0 }));
+  depotState[depoCode] = norm;
+  recomputeTrendAndKPI();
+}
+
+const bdgCsvInput=document.getElementById('bdgCsvInput');
+if(bdgCsvInput){ bdgCsvInput.addEventListener('change', function(){ const f=this.files[0]; if(f) readLocalCSV(f,'BDG') }) }
+function bdgDragOver(e){ e.preventDefault(); document.getElementById('bdgDz').style.borderColor = '#60a5fa' }
+function bdgDragLeave(){ document.getElementById('bdgDz').style.borderColor = '#334155' }
+function bdgDropCSV(e){ e.preventDefault(); bdgDragLeave(); const f=e.dataTransfer.files[0]; if(f) readLocalCSV(f,'BDG') }
+
+const crbCsvInput=document.getElementById('crbCsvInput');
+if(crbCsvInput){ crbCsvInput.addEventListener('change', function(){ const f=this.files[0]; if(f) readLocalCSV(f,'CRB') }) }
+function crbDragOver(e){ e.preventDefault(); document.getElementById('crbDz').style.borderColor = '#60a5fa' }
+function crbDragLeave(){ document.getElementById('crbDz').style.borderColor = '#334155' }
+function crbDropCSV(e){ e.preventDefault(); crbDragLeave(); const f=e.dataTransfer.files[0]; if(f) readLocalCSV(f,'CRB') }
+
+const krwCsvInput=document.getElementById('krwCsvInput');
+if(krwCsvInput){ krwCsvInput.addEventListener('change', function(){ const f=this.files[0]; if(f) readLocalCSV(f,'KRW') }) }
+function krwDragOver(e){ e.preventDefault(); document.getElementById('krwDz').style.borderColor = '#60a5fa' }
+function krwDragLeave(){ document.getElementById('krwDz').style.borderColor = '#334155' }
+function krwDropCSV(e){ e.preventDefault(); krwDragLeave(); const f=e.dataTransfer.files[0]; if(f) readLocalCSV(f,'KRW') }
+
+function readLocalCSV(file, depo){
+  const reader=new FileReader();
+  reader.onload=()=>{
+    const rows=parseDepotCSV(reader.result);
+    if(!rows.length){ showToast('CSV kosong / header salah (butuh: period,demand,forecast)'); return }
+    if(depo==='BDG'){ updateDepotChartFromRows(rows, bdgChartInst); storeDepotState('BDG', rows); }
+    if(depo==='CRB'){ updateDepotChartFromRows(rows, crbChartInst); storeDepotState('CRB', rows); }
+    if(depo==='KRW'){ updateDepotChartFromRows(rows, krwChartInst); storeDepotState('KRW', rows); }
+    showToast(`Grafik ${depo} diperbarui dari CSV`)
+  };
+  reader.readAsText(file)
+}
+</script>
+</body>
+</html>
