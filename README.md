@@ -5,5 +5,3 @@ Untuk input beberapa fitur yang didalamnya dapat terlebih dahulu untuk
 
 # Forecasting Fix Order
 **▶ [Open the App](https://ornandol.github.io/Forecasting-Fix-Order/)**
-
-Atau lihat sumber kodenya: [`index.html`](./index.html)
