@@ -77,7 +77,7 @@
   <nav class="tabs" id="tabs">
     <button class="tab active" data-view="dashboard">Dashboard</button>
     <button class="tab" data-view="validation">Validation</button>
-    <button class="tab" data-view="ai">AI Forecast</button>
+    <button class="tab" data-view="ai">ML Forecast</button>
     <button class="tab" data-view="scenario">Scenario</button>
     <button class="tab" data-view="approvals">Approval & Audit</button>
     <button class="tab" data-view="persona">Persona</button>
@@ -163,9 +163,18 @@
     </div>
 
     <div class="grid" style="margin-top:12px;grid-template-columns:repeat(3,1fr)">
-      <div class="card"><h4 style="margin:0 0 8px 0">Bandung – Demand vs Forecast</h4><canvas id="bdgChart" height="110"></canvas></div>
-      <div class="card"><h4 style="margin:0 0 8px 0">Cirebon – Demand vs Forecast</h4><canvas id="crbChart" height="110"></canvas></div>
-      <div class="card"><h4 style="margin:0 0 8px 0">Karawang – Demand vs Forecast</h4><canvas id="krwChart" height="110"></canvas></div>
+      <div class="card">
+        <h4 style="margin:0 0 8px 0">Bandung – Demand vs Forecast</h4>
+        <canvas id="bdgChart" height="110"></canvas>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 8px 0">Cirebon – Demand vs Forecast</h4>
+        <canvas id="crbChart" height="110"></canvas>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 8px 0">Karawang – Demand vs Forecast</h4>
+        <canvas id="krwChart" height="110"></canvas>
+      </div>
     </div>
   </section>
 
@@ -175,7 +184,7 @@
       <div class="row" style="justify-content:space-between;margin-bottom:8px">
         <h3 style="margin:0">Forecast Validation</h3>
         <div class="row">
-          <span class="muted">Flag: <span class="badge red">RED</span> Anomali • <span class="badge yellow">YELLOW</span> Waspada • <span class="badge green">GREEN</span> Normal</span>
+          <span class="muted">Flag: <span class="badge red">RED</</span> Anomali • <span class="badge yellow">YELLOW</span> Waspada • <span class="badge green">GREEN</span> Normal</span>
           <button class="btn primary" onclick="bulkAccept()">Accept All (Mock)</button>
         </div>
       </div>
@@ -189,11 +198,11 @@
     </div>
   </section>
 
-  <!-- AI FORECAST -->
+  <!-- ML FORECAST -->
   <section id="ai" class="view hidden">
     <div class="card">
       <div class="row" style="justify-content:space-between;margin-bottom:8px">
-        <h3 style="margin:0">AI Forecast Recommendation (Fix Order)</h3>
+        <h3 style="margin:0">ML Forecast Recommendation (Fix Order)</h3>
         <div class="row">
           <label class="muted">Budget Cap</label>
           <input id="cap" type="number" value="50000000" style="width:160px">
@@ -362,6 +371,20 @@
   </div>
 </div>
 
+<!-- Chart Zoom Modal -->
+<div id="chartModal" class="modal">
+  <div class="box" style="max-width:900px;width:95%;height:70vh;display:flex;flex-direction:column">
+    <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h3 id="chartModalTitle" style="margin:0">Detail Chart</h3>
+      <button class="btn" onclick="closeChartModal()">Tutup</button>
+    </div>
+    <div style="flex:1;min-height:0;">
+      <canvas id="chartModalCanvas" style="width:100%;height:100%"></canvas>
+    </div>
+    <p class="muted" style="margin-top:6px">Klik di area luar atau tombol Tutup untuk kembali.</p>
+  </div>
+</div>
+
 <div id="toast" class="toast">Tersimpan</div>
 
 <script>
@@ -465,11 +488,75 @@ const krwChartInst = new Chart(document.getElementById('krwChart'),{
   options:{plugins:{legend:{labels:{color:'#cbd5e1'}}}, scales:{y:{grid:{color:'rgba(148,163,184,.15)'}}}}
 });
 
+// ===== Chart Zoom (klik untuk perbesar) =====
+let largeChartInst = null;
+
+function openChartModal(title, sourceChart){
+  const modal = document.getElementById('chartModal');
+  const titleEl = document.getElementById('chartModalTitle');
+  const canvas = document.getElementById('chartModalCanvas');
+  const ctx = canvas.getContext('2d');
+
+  titleEl.textContent = title;
+
+  if(largeChartInst){
+    largeChartInst.destroy();
+    largeChartInst = null;
+  }
+
+  const srcData = sourceChart.data;
+  const clonedData = {
+    labels: [...srcData.labels],
+    datasets: srcData.datasets.map(ds=>({
+      ...ds,
+      data: [...ds.data],
+      borderWidth: (ds.borderWidth || 2) + 1,
+      pointRadius: 3,
+      pointHitRadius: 6
+    }))
+  };
+
+  largeChartInst = new Chart(ctx,{
+    type: sourceChart.config.type || 'line',
+    data: clonedData,
+    options:{
+      plugins:{legend:{labels:{color:'#cbd5e1'}}},
+      scales:{
+        x:{grid:{color:'rgba(148,163,184,.2)'}, ticks:{color:'#cbd5e1'}},
+        y:{grid:{color:'rgba(148,163,184,.2)'}, ticks:{color:'#cbd5e1'}}
+      },
+      maintainAspectRatio:false
+    }
+  });
+
+  modal.style.display='flex';
+}
+
+function closeChartModal(){
+  const modal = document.getElementById('chartModal');
+  modal.style.display='none';
+}
+
+document.getElementById('chartModal').addEventListener('click', function(e){
+  if(e.target.id === 'chartModal'){
+    closeChartModal();
+  }
+});
+
+// Set cursor & klik pada 3 chart depo
+document.getElementById('bdgChart').style.cursor='zoom-in';
+document.getElementById('bdgChart').onclick = ()=>openChartModal('Bandung – Demand vs Forecast', bdgChartInst);
+
+document.getElementById('crbChart').style.cursor='zoom-in';
+document.getElementById('crbChart').onclick = ()=>openChartModal('Cirebon – Demand vs Forecast', crbChartInst);
+
+document.getElementById('krwChart').style.cursor='zoom-in';
+document.getElementById('krwChart').onclick = ()=>openChartModal('Karawang – Demand vs Forecast', krwChartInst);
+
 // ===== Filter Depo (checklist) =====
 function getSelectedDepos() {
   const checks = document.querySelectorAll('input[name="depoFilterChk"]:checked');
   const values = [...checks].map(c => c.value);
-  // Jika semua unchecked → treat sebagai ALL (supaya insight tetap muncul)
   if (!values.length) return ['BDG','CRB','KRW'];
   return values;
 }
@@ -585,7 +672,6 @@ function recomputeFromDashboard(){
   const selectedDepos = getSelectedDepos();
 
   if(!dashboardRows.length){
-    // fallback: pakai mock
     recomputeTrendAndKPI_Mock(selectedDepos);
     return;
   }
@@ -612,7 +698,7 @@ function monthLabelFromPeriod(ym){
 
 function rebuildDepotChartsFromDashboard(rows){
   const agg = {
-    BDG: new Map(), // period -> {demand, forecast}
+    BDG: new Map(),
     CRB: new Map(),
     KRW: new Map()
   };
@@ -668,7 +754,7 @@ function rebuildAccuracyTrendFromDashboard(rows){
   const accSeries = periods.map(p => {
     const v = byPeriod.get(p);
     const mape = v.cnt ? (v.sumErr / v.cnt) * 100 : 0;
-    return Math.max(0, 100 - mape); // Akurasi per bulan
+    return Math.max(0, 100 - mape);
   });
 
   accChartInst.data.labels = labels;
@@ -696,7 +782,6 @@ function recomputeKPIandRibbonFromDashboard(rows){
   const currentYear = years.length ? Math.max(...years) : null;
   const ytdRows = currentYear ? rows.filter(r => r.year === currentYear) : rows;
 
-  // MAPE
   let sumErr = 0;
   let cntErr = 0;
   ytdRows.forEach(r => {
@@ -709,7 +794,6 @@ function recomputeKPIandRibbonFromDashboard(rows){
   const mape = cntErr ? (sumErr / cntErr) * 100 : 0;
   const acc = Math.max(0, 100 - mape);
 
-  // Service Rate
   let sumPO = 0, sumSupply = 0;
   ytdRows.forEach(r => {
     sumPO += r.po_md;
@@ -717,7 +801,6 @@ function recomputeKPIandRibbonFromDashboard(rows){
   });
   const sr = sumPO > 0 ? (sumSupply / sumPO) * 100 : 0;
 
-  // Backorder
   let boAmt = 0;
   ytdRows.forEach(r => {
     const bo = r.po_md - r.supply_ahm;
@@ -727,7 +810,7 @@ function recomputeKPIandRibbonFromDashboard(rows){
   accEl.textContent = acc.toFixed(1) + '%';
   srEl.textContent = sr.toFixed(1) + '%';
   boEl.textContent = boAmt.toFixed(0);
-  stockEl.textContent = '—'; // bisa diisi coverage hari jika ada data stock
+  stockEl.textContent = '—';
 
   if(rib && currentYear){
     rib.textContent = `${currentYear} YTD Akurasi (MAPE) ${acc.toFixed(1)}% • SR AHM ${sr.toFixed(1)}% • BO ${boAmt.toFixed(0)} unit`;
@@ -778,7 +861,6 @@ function recomputeTrendAndKPI_Mock(selectedDepos){
   accChartInst.data.datasets[0].data = accSeries;
   accChartInst.update();
 
-  // KPI mock
   document.getElementById('kpi-acc').textContent = dataMock.kpi.forecast_acc.toFixed(1) + '%';
   document.getElementById('kpi-sr').textContent = fmtPct(dataMock.kpi.service_rate);
   document.getElementById('kpi-ls').textContent = dataMock.kpi.lost_sales;
@@ -834,7 +916,6 @@ function renderCons(){
     consBody.appendChild(tr);
   });
 
-  // setiap kali rekomendasi berubah, re-evaluate supply vs PO kalau sudah ada supply plan
   recomputeSupplyVsPO();
 }
 
@@ -851,7 +932,6 @@ function runSolver(){
   addTimeline(`Solver dijalankan (Target SL ${targetSL}%)`);
   addAudit('Run solver mock & update rekomendasi');
 
-  // setelah solver adjust rekomendasi, refresh supply vs PO view
   recomputeSupplyVsPO();
 
   showToast('Solver selesai (mock)')
@@ -912,7 +992,7 @@ function exportConsCSV(){
 }
 
 // ===== Supply Plan AHM (AI tab) =====
-let supplyPlan = []; // {part_no, depo, supply}
+let supplyPlan = [];
 
 const supplyInput = document.getElementById('supplyInput');
 const supplyBody = document.querySelector('#supplyTable tbody');
