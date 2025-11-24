@@ -16,7 +16,7 @@
 
   <style>
     :root{
-      --bg:#433063;
+      --bg:#24143f;
       --panel:#201127;
       --panel-light:#2c1c35;
       --muted:#cbd5e1;
@@ -492,10 +492,25 @@
           <input id="groupMasterInput" type="file" accept=".csv,.xlsx" style="display:none">
         </div>
 
+        <!-- Quick Load Sample dari GitHub -->
+        <div class="card" style="padding:10px 12px;display:flex;flex-direction:column;gap:6px;max-width:260px">
+          <span class="muted">Quick Load Sample dari GitHub</span>
+          <button class="btn" style="margin-bottom:6px" onclick="loadSampleDashboardFromGithub()">
+            Load Sample CSV Dashboard
+          </button>
+          <button class="btn" onclick="loadSampleGroupMasterFromGithub()">
+            Load Sample Master Group
+          </button>
+          <span class="muted">
+            File dibaca dari folder <code>/data</code> di repo GitHub Pages.
+          </span>
+        </div>
+
         <div class="muted" style="max-width:260px">
           Semua KPI & chart di Dashboard akan ter-filter oleh kombinasi Depo + Group Besar + Group.
         </div>
       </div>
+
 
       <!-- Charts row 1 -->
       <div class="grid" style="margin-top:14px;grid-template-columns:1fr 1fr">
@@ -582,6 +597,9 @@
             <button class="btn" onclick="exportConsCSV()">Export PO (CSV)</button>
           </div>
         </div>
+      <div class="row" style="margin-bottom:8px">
+        <button class="btn" onclick="loadSampleForecast()">Load Sample Forecast dari GitHub</button>
+      </div>
 
         <div class="row" style="margin-bottom:10px;align-items:flex-start">
           <!-- Forecast ML -->
@@ -611,6 +629,9 @@
               <code>part_no,depo,supply</code>
             </span>
             <input id="supplyInput" type="file" accept=".csv,.xlsx" style="display:none">
+          </div>
+          <div class="row" style="margin-bottom:8px">
+            <button class="btn" onclick="loadSampleSupply()">Load Sample Supply Plan dari GitHub</button>
           </div>
 
           <div class="note" style="max-width:260px">
@@ -690,6 +711,7 @@
             </span>
             <input id="tplInput" type="file" accept=".xlsx,.csv" style="display:none">
           </div>
+          <button class="btn" onclick="loadSampleScenario()">Load Sample Template dari GitHub</button>
 
           <button class="btn" onclick="reloadDepoForScenario()">Reload Depo Series</button>
           <button class="btn primary" onclick="applyScenarioFromTemplate()">Apply from Template</button>
@@ -890,6 +912,14 @@
   function varGet(name){
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   }
+  // ===== Sample file URL (relative ke root GitHub Pages) =====
+  const SAMPLE_FORECAST_URL = 'data/forecast_sample.csv';
+  const SAMPLE_SUPPLY_URL   = 'data/supply_sample.csv';
+  const SAMPLE_SCENARIO_URL = 'data/scenario_template.csv';
+  const SAMPLE_DASHBOARD_URL   = 'data/dashboard_sample.csv';
+  const SAMPLE_GROUPMASTER_URL = 'data/master_group_sample.csv';
+
+
 
   function normKey(k){
     return String(k || '')
@@ -1506,6 +1536,35 @@
     };
     reader.readAsArrayBuffer(file);
   }
+    // ===== Load Sample Master Group dari GitHub (/data/master_group_sample.csv) =====
+  async function loadSampleGroupMasterFromGithub(){
+    try{
+      showToast('Loading sample Master Group dari GitHub...');
+      const res = await fetch(SAMPLE_GROUPMASTER_URL);
+      if(!res.ok){
+        showToast('Gagal fetch sample Master Group (cek path di GitHub)');
+        return;
+      }
+
+      const buf = await res.arrayBuffer();
+      const wb  = XLSX.read(new Uint8Array(buf), { type:'array' });
+      const ws  = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(ws, { defval:'' });
+
+      if(!json.length){
+        showToast('Sample Master Group kosong / tidak terbaca.');
+        return;
+      }
+
+      loadGroupMaster(json);  // pakai engine existing
+      addAudit(`Load sample Master Group dari GitHub (${json.length} baris)`);
+      showToast('Sample Master Group dari GitHub berhasil dimuat');
+    }catch(err){
+      console.error('Error loadSampleGroupMasterFromGithub', err);
+      showToast('Error load sample Master Group (lihat console)');
+    }
+  }
+
 
   function loadGroupMaster(rows){
     groupMaster = rows.map(r=>{
@@ -1572,6 +1631,37 @@
     };
     reader.readAsText(file);
   }
+    // ===== Load Sample CSV Dashboard dari GitHub (/data/dashboard_sample.csv) =====
+  async function loadSampleDashboardFromGithub(){
+    try{
+      showToast('Loading sample Dashboard dari GitHub...');
+      const res = await fetch(SAMPLE_DASHBOARD_URL);
+      if(!res.ok){
+        showToast('Gagal fetch sample Dashboard (cek path di GitHub)');
+        return;
+      }
+
+      const text = await res.text();
+      const rows = parseDashboardCSV(text);
+
+      if(!rows.length){
+        showToast('Sample Dashboard kosong / header tidak cocok.');
+        return;
+      }
+
+      dashboardRows = rows;
+      enrichDashboardWithGroupMaster();
+      rebuildGroupFilterUI();
+      recomputeFromDashboard();
+
+      addAudit(`Load sample Dashboard dari GitHub (${rows.length} baris)`);
+      showToast('Sample CSV Dashboard dari GitHub berhasil dimuat');
+    }catch(err){
+      console.error('Error loadSampleDashboardFromGithub', err);
+      showToast('Error load sample Dashboard (lihat console)');
+    }
+  }
+
 
   // Tambah mapping Group Besar → Dashboard rows
   function enrichDashboardWithGroupMaster(){
@@ -2199,6 +2289,28 @@
     reader.readAsArrayBuffer(file);
   }
 
+    // ===== Load Sample Forecast langsung dari GitHub =====
+  async function loadSampleForecast(){
+    try{
+      showToast('Loading sample Forecast dari GitHub...');
+      const res = await fetch(SAMPLE_FORECAST_URL);
+      if(!res.ok){
+        showToast('Gagal fetch sample Forecast (cek path di GitHub)');
+        return;
+      }
+      const buf = await res.arrayBuffer();
+      const wb = XLSX.read(new Uint8Array(buf), { type:'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(ws,{defval:''});
+      loadForecastFromJson(json); // pakai engine existing
+      addAudit('Load sample Forecast dari GitHub');
+    }catch(err){
+      console.error(err);
+      showToast('Error load sample Forecast (lihat console)');
+    }
+  }
+
+
   function loadForecastFromJson(rows){
     if(!rows || !rows.length){
       showToast('File Forecast kosong / header salah. Pastikan header: part_no,depo,forecast_qty,on_hand,on_order,moq,pack');
@@ -2373,6 +2485,28 @@
     };
     reader.readAsArrayBuffer(file);
   }
+
+    // ===== Load Sample Supply Plan dari GitHub =====
+  async function loadSampleSupply(){
+    try{
+      showToast('Loading sample Supply Plan dari GitHub...');
+      const res = await fetch(SAMPLE_SUPPLY_URL);
+      if(!res.ok){
+        showToast('Gagal fetch sample Supply Plan (cek path di GitHub)');
+        return;
+      }
+      const buf = await res.arrayBuffer();
+      const wb = XLSX.read(new Uint8Array(buf), { type:'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(ws,{defval:''});
+      loadSupplyFromJson(json); // fungsi existing Anda
+      addAudit('Load sample Supply Plan dari GitHub');
+    }catch(err){
+      console.error(err);
+      showToast('Error load sample Supply Plan (lihat console)');
+    }
+  }
+
 
   function loadSupplyFromJson(rows){
     if(!rows || !rows.length){
@@ -2599,6 +2733,27 @@
       loadTemplateRows(json);
     };
     reader.readAsArrayBuffer(file);
+  }
+
+    // ===== Load Sample Scenario Template dari GitHub =====
+  async function loadSampleScenario(){
+    try{
+      showToast('Loading sample Scenario Template dari GitHub...');
+      const res = await fetch(SAMPLE_SCENARIO_URL);
+      if(!res.ok){
+        showToast('Gagal fetch sample Scenario (cek path di GitHub)');
+        return;
+      }
+      const buf = await res.arrayBuffer();
+      const wb = XLSX.read(new Uint8Array(buf), { type:'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(ws,{defval:''});
+      loadTemplateRows(json); // fungsi existing engine Scenario
+      addAudit('Load sample Scenario Template dari GitHub');
+    }catch(err){
+      console.error(err);
+      showToast('Error load sample Scenario (lihat console)');
+    }
   }
 
   function loadTemplateRows(rows){
